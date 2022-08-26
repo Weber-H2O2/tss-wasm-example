@@ -1,13 +1,15 @@
+import { ethers, network } from "hardhat";
+
 const { gg18 } = require("@ieigen/tss-wasm-node");
 
 var items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }];
 
-var results = [];
+var results: any = [];
 
 let t = 1;
 let n = 3;
 
-async function keygen(arg) {
+async function keygen() {
   let context = await gg18.gg18_keygen_client_new_context(
     "http://127.0.0.1:8000",
     t,
@@ -27,13 +29,13 @@ async function keygen(arg) {
   return keygen_json;
 }
 
-async function sign(arg, key_store) {
+async function sign(key_store: string, message: string) {
   let context = await gg18.gg18_sign_client_new_context(
     "http://127.0.0.1:8000",
     t,
     n,
     key_store,
-    "Hello Eigen"
+    message
   );
   console.log("sign new context: ", context);
   context = await gg18.gg18_sign_client_round0(context);
@@ -60,8 +62,10 @@ async function sign(arg, key_store) {
 }
 
 async function main() {
+  const [user, wallet] = await ethers.getSigners();
+
   items.forEach(async function (item) {
-    let res = await keygen(item);
+    let res: any = await keygen();
     results.push(res);
 
     if (results.length == items.length) {
@@ -69,7 +73,7 @@ async function main() {
       items.forEach(async function (item) {
         if (item.idx < t + 1) {
           console.log(item.idx, " ", results[item.idx]);
-          res = await sign(item, results[item.idx]);
+          res = await sign(results[item.idx], "");
           console.log("Sign result: ", res);
         }
       });
