@@ -1,5 +1,4 @@
-import { ethers, network } from "hardhat";
-
+import "dotenv/config";
 const { gg18 } = require("@ieigen/tss-wasm-node");
 
 var items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }];
@@ -61,8 +60,77 @@ async function sign(key_store: string, message: string) {
   return sign_json;
 }
 
+const { ethers } = require("ethers");
+
+const INFURA_ID = process.env.INFURA_ID;
+const provider = new ethers.providers.JsonRpcProvider(
+  `https://ropsten.infura.io/v3/${INFURA_ID}`
+);
+
+const privateKey1 = process.env.DEVNET_PRIVKEY; // Private key of account 1
+
+const wallet = new ethers.Wallet(privateKey1, provider);
+const account1 = wallet.address;
+const account2 = wallet.address;
+
+const test_send = async () => {
+  console.log("Test send by ethers");
+  const senderBalanceBefore = await provider.getBalance(account1);
+  const recieverBalanceBefore = await provider.getBalance(account2);
+
+  console.log(
+    `\nSender balance before: ${ethers.utils.formatEther(senderBalanceBefore)}`
+  );
+  console.log(
+    `reciever balance before: ${ethers.utils.formatEther(
+      recieverBalanceBefore
+    )}\n`
+  );
+
+  const tx = await wallet.sendTransaction({
+    to: account2,
+    value: ethers.utils.parseEther("0.025"),
+  });
+
+  await tx.wait();
+  console.log(tx);
+
+  const senderBalanceAfter = await provider.getBalance(account1);
+  const recieverBalanceAfter = await provider.getBalance(account2);
+
+  console.log(
+    `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
+  );
+  console.log(
+    `reciever balance after: ${ethers.utils.formatEther(
+      recieverBalanceAfter
+    )}\n`
+  );
+
+  let transaction = {
+    to: account2.address,
+    value: ethers.utils.parseEther("0.1"),
+    gasLimit: "21000",
+    maxPriorityFeePerGas: ethers.utils.parseUnits("5", "gwei"),
+    maxFeePerGas: ethers.utils.parseUnits("20", "gwei"),
+    nonce: 1,
+    type: 2,
+    chainId: 3,
+  };
+  // sign and serialize the transaction
+  let rawTransaction = await wallet
+    .signTransaction(transaction)
+    .then(ethers.utils.serializeTransaction(transaction));
+
+  // print the raw transaction hash
+  console.log("Raw txhash string " + rawTransaction);
+
+  await provider.waitForTransaction(rawTransaction);
+};
+
 async function main() {
-  const [user, wallet] = await ethers.getSigners();
+  await test_send();
+  return;
 
   items.forEach(async function (item) {
     let res: any = await keygen();
