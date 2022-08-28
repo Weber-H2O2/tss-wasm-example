@@ -87,25 +87,28 @@ const test_send = async () => {
     )}\n`
   );
 
-  const tx = await wallet.sendTransaction({
-    to: account2,
-    value: ethers.utils.parseEther("0.025"),
-  });
+  // const tx = await wallet.sendTransaction({
+  //   to: account2,
+  //   value: ethers.utils.parseEther("0.025"),
+  // });
 
-  await tx.wait();
-  console.log(tx);
+  // await tx.wait();
+  // console.log(tx);
 
-  const senderBalanceAfter = await provider.getBalance(account1);
-  const recieverBalanceAfter = await provider.getBalance(account2);
+  // const senderBalanceAfter = await provider.getBalance(account1);
+  // const recieverBalanceAfter = await provider.getBalance(account2);
 
-  console.log(
-    `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
-  );
-  console.log(
-    `reciever balance after: ${ethers.utils.formatEther(
-      recieverBalanceAfter
-    )}\n`
-  );
+  // console.log(
+  //   `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
+  // );
+  // console.log(
+  //   `reciever balance after: ${ethers.utils.formatEther(
+  //     recieverBalanceAfter
+  //   )}\n`
+  // );
+  const txCount = await provider.getTransactionCount(account1);
+
+  console.log("txCount (aka nonce): ", txCount);
 
   let transaction = {
     to: account2.address,
@@ -113,7 +116,7 @@ const test_send = async () => {
     gasLimit: "21000",
     maxPriorityFeePerGas: ethers.utils.parseUnits("5", "gwei"),
     maxFeePerGas: ethers.utils.parseUnits("20", "gwei"),
-    nonce: 1,
+    nonce: ethers.utils.hexlify(txCount),
     type: 2,
     chainId: 3,
   };
