@@ -1,4 +1,8 @@
 import "dotenv/config";
+const { ethers } = require("ethers");
+const { Transaction } = require("ethereumjs-tx");
+import { bufferToHex } from "ethereumjs-util";
+
 const { gg18 } = require("@ieigen/tss-wasm-node");
 
 var items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }];
@@ -60,23 +64,21 @@ async function sign(key_store: string, message: string) {
   return sign_json;
 }
 
-const { ethers } = require("ethers");
-
 const INFURA_ID = process.env.INFURA_ID;
 const provider = new ethers.providers.JsonRpcProvider(
   `https://ropsten.infura.io/v3/${INFURA_ID}`
 );
 
-const privateKey1 = process.env.DEVNET_PRIVKEY; // Private key of account 1
+const privateKey1: string | undefined = process.env.DEVNET_PRIVKEY; // Private key of account 1
 
 const wallet = new ethers.Wallet(privateKey1, provider);
-const account1 = wallet.address;
-const account2 = wallet.address;
+const from = wallet.address;
+const to = wallet.address;
 
-const test_send = async () => {
+const test_sign_by_private_key = async () => {
   console.log("Test send by ethers");
-  const senderBalanceBefore = await provider.getBalance(account1);
-  const recieverBalanceBefore = await provider.getBalance(account2);
+  const senderBalanceBefore = await provider.getBalance(from);
+  const recieverBalanceBefore = await provider.getBalance(to);
 
   console.log(
     `\nSender balance before: ${ethers.utils.formatEther(senderBalanceBefore)}`
@@ -87,55 +89,111 @@ const test_send = async () => {
     )}\n`
   );
 
-  // const tx = await wallet.sendTransaction({
-  //   to: account2,
-  //   value: ethers.utils.parseEther("0.025"),
-  // });
+  const tx1 = await wallet.sendTransaction({
+    to,
+    value: ethers.utils.parseEther("0.025"),
+  });
 
-  // await tx.wait();
-  // console.log(tx);
+  await tx1.wait();
+  console.log(tx1);
 
-  // const senderBalanceAfter = await provider.getBalance(account1);
-  // const recieverBalanceAfter = await provider.getBalance(account2);
+  const senderBalanceAfter = await provider.getBalance(from);
+  const recieverBalanceAfter = await provider.getBalance(to);
 
-  // console.log(
-  //   `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
-  // );
-  // console.log(
-  //   `reciever balance after: ${ethers.utils.formatEther(
-  //     recieverBalanceAfter
-  //   )}\n`
-  // );
-  const txCount = await provider.getTransactionCount(account1);
+  console.log(
+    `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
+  );
+  console.log(
+    `reciever balance after: ${ethers.utils.formatEther(
+      recieverBalanceAfter
+    )}\n`
+  );
 
-  console.log("txCount (aka nonce): ", txCount);
+  const txCount = await provider.getTransactionCount(from);
 
-  let transaction = {
-    to: account2.address,
-    value: ethers.utils.parseEther("0.1"),
-    gasLimit: "21000",
-    maxPriorityFeePerGas: ethers.utils.parseUnits("5", "gwei"),
-    maxFeePerGas: ethers.utils.parseUnits("20", "gwei"),
-    nonce: ethers.utils.hexlify(txCount),
-    type: 2,
-    chainId: 3,
-  };
-  // sign and serialize the transaction
-  let rawTransaction = await wallet
-    .signTransaction(transaction)
-    .then(ethers.utils.serializeTransaction(transaction));
+  let data = "";
 
-  // print the raw transaction hash
-  console.log("Raw txhash string " + rawTransaction);
+  // Sign the string message
+  let flatSig = await wallet.signMessage(data);
 
-  await provider.waitForTransaction(rawTransaction);
+  // For Solidity, we need the expanded-format of a signature
+  let sig = ethers.utils.splitSignature(flatSig);
+
+  const rawTx = [
+    ethers.utils.hexlify(txCount), // nonce
+    "0x09184e72a000", // gasPrice
+    "0x2710", // gasLimit
+    to, // to
+    ethers.utils.hexlify(ethers.utils.parseEther("0.1")), // value
+    "0x", // data
+    ethers.utils.hexlify(sig.v), // v
+    sig.r, // r
+    sig.s, // s
+  ];
+
+  console.log("Raw tx: ", rawTx);
+
+  const tx2 = new Transaction(rawTx);
+
+  console.log("Senders Address: " + tx2.getSenderAddress().toString("hex"));
+
+  if (tx2.getSenderAddress().toString("hex") != from) {
+    console.error("The raw transatcion is error");
+    return;
+  }
+
+  if (tx2.verifySignature()) {
+    console.log("Signature Checks out!");
+  }
+
+  const { hash } = await provider.sendTransaction(
+    "0x" + tx2.serialize().toString("hex")
+  );
+
+  console.log("Raw txhash string: " + hash);
+
+  await provider.waitForTransaction(hash);
 };
 
-async function main() {
-  await test_send();
-  return;
+const test_sign_by_gg18 = async () => {
+  console.log("Test send by ethers");
+  const senderBalanceBefore = await provider.getBalance(from);
+  const recieverBalanceBefore = await provider.getBalance(to);
 
-  items.forEach(async function (item) {
+  console.log(
+    `\nSender balance before: ${ethers.utils.formatEther(senderBalanceBefore)}`
+  );
+  console.log(
+    `reciever balance before: ${ethers.utils.formatEther(
+      recieverBalanceBefore
+    )}\n`
+  );
+
+  const tx1 = await wallet.sendTransaction({
+    to,
+    value: ethers.utils.parseEther("0.025"),
+  });
+
+  await tx1.wait();
+  console.log(tx1);
+
+  const senderBalanceAfter = await provider.getBalance(from);
+  const recieverBalanceAfter = await provider.getBalance(to);
+
+  console.log(
+    `\nSender balance after: ${ethers.utils.formatEther(senderBalanceAfter)}`
+  );
+  console.log(
+    `reciever balance after: ${ethers.utils.formatEther(
+      recieverBalanceAfter
+    )}\n`
+  );
+
+  const txCount = await provider.getTransactionCount(from);
+
+  let data = "";
+
+  await items.forEach(async function (item) {
     let res: any = await keygen();
     results.push(res);
 
@@ -144,12 +202,68 @@ async function main() {
       items.forEach(async function (item) {
         if (item.idx < t + 1) {
           console.log(item.idx, " ", results[item.idx]);
-          res = await sign(results[item.idx], "");
+          res = await sign(results[item.idx], data);
           console.log("Sign result: ", res);
         }
       });
     }
   });
+
+  const rawTx = [
+    ethers.utils.hexlify(txCount), // nonce
+    "0x09184e72a000", // gasPrice
+    "0x2710", // gasLimit
+    to, // to
+    ethers.utils.hexlify(ethers.utils.parseEther("0.1")), // value
+    "0x", // data
+    results.v, // v
+    results.r,
+    results.s, // r // s
+  ];
+
+  console.log("Raw tx: ", rawTx);
+
+  const tx2 = new Transaction(rawTx);
+
+  console.log("Senders Address: " + tx2.getSenderAddress().toString("hex"));
+
+  if (tx2.getSenderAddress().toString("hex") != from) {
+    console.error("The raw transatcion is error");
+    return;
+  }
+
+  if (tx2.verifySignature()) {
+    console.log("Signature Checks out!");
+  }
+
+  const { hash } = await provider.sendTransaction(
+    "0x" + tx2.serialize().toString("hex")
+  );
+
+  console.log("Raw txhash string: " + hash);
+
+  await provider.waitForTransaction(hash);
+};
+
+async function main() {
+  // items.forEach(async function (item) {
+  //   let res: any = await keygen();
+  //   results.push(res);
+
+  //   if (results.length == items.length) {
+  //     console.log(results.length);
+  //     items.forEach(async function (item) {
+  //       if (item.idx < t + 1) {
+  //         console.log(item.idx, " ", results[item.idx]);
+  //         res = await sign(results[item.idx], "");
+  //         console.log("Sign result: ", res);
+  //       }
+  //     });
+  //   }
+  // });
+
+  await test_sign_by_private_key();
+  await test_sign_by_gg18();
 }
 
 main()
